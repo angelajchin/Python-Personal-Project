@@ -9,6 +9,8 @@ import pandas as pd
 from pydantic import BaseModel
 import mediapipe as mp
 import os
+from numpy import np
+
 os.makedirs('dataset', exist_ok=True)
 
 scale_factor = 0.5
@@ -69,12 +71,31 @@ for source_path in glob('Videos/*'):
                 if results.pose_landmarks:
                     landmarks = results.pose_landmarks.landmark
 
+                    def calculate_angle(a,b,c):
+                        a = np.array(a) # First
+                        b = np.array(b) # Mid
+                        c = np.array(c) # End
+    
+                        radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
+                        angle = np.abs(radians*180.0/np.pi)
+    
+                        if angle >180.0:
+                            angle = 360-angle
+        
+                        return angle 
+
                     def get_coords(index):
                         return (landmarks[index].x, landmarks[index].y)
 
-                    right_ankle = get_coords(get_keypoint.RIGHT_ANKLE)
-                    right_knee = get_coords(get_keypoint.RIGHT_KNEE)
                     right_hip = get_coords(get_keypoint.RIGHT_HIP)
+                    right_knee = get_coords(get_keypoint.RIGHT_KNEE)
+                    right_ankle = get_coords(get_keypoint.RIGHT_ANKLE)
+                    left_hip = get_coords(get_keypoint.LEFT_HIP)
+                    left_knee = get_coords(get_keypoint.LEFT_KNEE)
+                    left_ankle = get_coords(get_keypoint.LEFT_ANKLE)
+
+                    right_knee_angle = calculate_angle(right_hip, right_knee, right_ankle)
+                    left_knee_angle = calculate_angle(left_hip, left_knee, left_ankle)
 
                     # Vectors
                     vector1 = (right_knee[0] - right_ankle[0], right_knee[1] - right_ankle[1])
@@ -83,7 +104,7 @@ for source_path in glob('Videos/*'):
                     dot_product = vector1[0] * vector2[0] + vector1[1] * vector2[1]
                     magnitude1 = math.sqrt(vector1[0]**2 + vector1[1]**2)
                     magnitude2 = math.sqrt(vector2[0]**2 + vector2[1]**2)
-                    angle_rad = math.acos(dot_product / (magnitude1 * magnitude2 + 1e-6))  # add epsilon to avoid zero-div
+                    angle_rad = math.acos(dot_product / (magnitude1 * magnitude2 + 1e-6))
                     angle_deg = math.degrees(angle_rad)
 
                     time_diff = current_time - prev_time
@@ -103,8 +124,11 @@ for source_path in glob('Videos/*'):
                     data_list.append({
                         'time': current_time,
                         'linear_acceleration': linear_acceleration,
-                        'angular_velocity': angular_velocity
+                        'angular_velocity': angular_velocity,
+                        'right_knee_angle': right_knee_angle,
+                        'left_knee_angle': left_knee_angle
                     })
+
             except Exception as e:
                 print(e)
 
